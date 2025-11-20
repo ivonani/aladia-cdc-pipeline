@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: appdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./sql/init_source.sql:/docker-entrypoint-initdb.d/01_init_source.sql
+      - ./sql/init_warehouse.sql:/docker-entrypoint-initdb.d/02_init_warehouse.sql
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+  cdc-producer:
+    build: ./cdc
+    depends_on:
+      - postgres
+      - kafka
+    restart: on-failure
+    environment:
+      DB_DSN: postgresql://app:app@postgres:5432/appdb
+      KAFKA_BOOTSTRAP: kafka:9092
+      CDC_TOPIC: orders_cdc
+      POLL_INTERVAL_MS: 1000
+
+  writer-simulator:
+    build: ./cdc
+    command: ["python", "writer_simulator.py"]
+    depends_on:
+      - postgres
+    restart: on-failure          
+    environment:                 
+      DB_DSN: postgresql://app:app@postgres:5432/appdb
+
+  spark:
+    build:
+      context: ./spark
+      dockerfile: Dockerfile
+    depends_on:
+      - kafka
+      - postgres
+    environment:
+      # These match what spark_cdc_etl.py expects
+      KAFKA_BOOTSTRAP: kafka:9092
+      DB_DSN_JDBC: jdbc:postgresql://postgres:5432/appdb
+      DB_USER: app
+      DB_PASSWORD: app
+      CDC_TOPIC: orders_cdc
+    volumes:
+      - ./spark:/opt/app

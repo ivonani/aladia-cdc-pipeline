@@ -14,7 +14,7 @@ This project implements the coding challenge from Aladia and is designed to be m
 ---
 
 ### Architecture Overview
-<div align="center">
+<div align="center" style="background:white; padding:20px; border-radius:8px;">
 
 ![Aladia CDC Pipeline Architecture overview](architecture_overview.png)
 </div>

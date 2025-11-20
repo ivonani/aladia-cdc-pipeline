@@ -16,59 +16,7 @@ This project implements the coding challenge from Aladia and is designed to be m
 ### Architecture Overview
 <div align="center">
 
-```plantuml
-@startuml
-title Real-Time CDC ETL Pipeline - Aladia Challenge
-
-skinparam componentStyle rectangle
-skinparam shadowing false
-skinparam ArrowColor #444444
-skinparam ArrowThickness 1.0
-skinparam defaultTextAlignment center
-skinparam packageStyle rectangle
-
-actor "Writer Simulator\n" as Writer
-
-package "PostgreSQL\n(OLTP Schema)" as OLTP {
-  [orders] as Orders
-  [orders_cdc_log\n(CDC Log table)] as CDCLog
-}
-
-package "CDC Producer\n(Python)" as CDC {
-  component "CDC Poller\n(reads CDC log table)" as Poller
-}
-
-package "Kafka\n(Message Queue)" as Kafka {
-  [orders_cdc] as KafkaTopic
-}
-
-package "Spark Structured Streaming\n(PySpark)" as Spark {
-  component "Kafka Consumer\n(JSON ingestion)" as Consumer
-  component "Transform + Enrich\n(versioning, schema)" as Transform
-  component "Upsert Writer\n(analytics.fct_orders)" as Upserter
-}
-
-database "Analytics Warehouse\n(Postgres schema)" as WH {
-  [analytics.fct_orders] as Fact
-  [analytics.failed_events] as Failed
-}
-
-' Data Flow
-Writer --> Orders : INSERT/UPDATE
-Orders --> CDCLog : Trigger-based CDC
-
-CDCLog --> Poller : SQL Polling
-Poller --> KafkaTopic : produce JSON events
-
-KafkaTopic --> Consumer
-Consumer --> Transform
-Transform --> Upserter
-
-Upserter --> Fact : upsert rows
-Upserter --> Failed : write errors
-
-@enduml
-```
+![Aladia CDC Pipeline Architecture overview](architecture_overview.png)
 </div>
 
 ---
@@ -134,6 +82,8 @@ Check data in warehouse:
 ```bash
 docker exec -it aladia-cdc-pipeline-postgres-1 psql -U app -d appdb
 ```
+---
+
 ### Testing the Pipeline
 #### 1. Writer simulator generates new orders
 Automatically inserts and updates orders every 2 seconds.
